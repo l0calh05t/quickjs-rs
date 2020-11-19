@@ -60,6 +60,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static={}", LIB_NAME);
 }
 
+#[cfg(not(target_env = "msvc"))]
 #[cfg(feature = "bundled")]
 fn main() {
     // compile statics
@@ -81,8 +82,6 @@ fn main() {
     apply_patches(&code_dir);
 
     eprintln!("Compiling quickjs...");
-    let quickjs_version =
-        std::fs::read_to_string(code_dir.join("VERSION")).expect("failed to read quickjs version");
     cc::Build::new()
         .files(
             [
@@ -96,10 +95,6 @@ fn main() {
             .map(|f| code_dir.join(f)),
         )
         .define("_GNU_SOURCE", None)
-        .define(
-            "CONFIG_VERSION",
-            format!("\"{}\"", quickjs_version.trim()).as_str(),
-        )
         .define("CONFIG_BIGNUM", None)
         // The below flags are used by the official Makefile.
         .flag_if_supported("-Wchar-subscripts")
@@ -122,6 +117,58 @@ fn main() {
         // and debug builds only happen once anyway so the optimization slowdown
         // is fine.
         .opt_level(2)
+        .compile(LIB_NAME);
+
+    std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
+        .expect("Could not copy bindings.rs");
+}
+
+#[cfg(target_env = "msvc")]
+#[cfg(feature = "bundled")]
+fn main() {
+    // compile statics
+    cc::Build::new()
+        .file("static-functions.c")
+        // JS_STRICT_NAN_BOXING required for MSVC build
+        .define("JS_STRICT_NAN_BOXING", None)
+        .define("_CRT_SECURE_NO_WARNINGS", None)
+        .flag_if_supported("/std:c++latest")
+        .compile("quickjs-static-functions.lib");
+
+    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    let code_dir = out_path.join("quickjs");
+    if exists(&code_dir) {
+        std::fs::remove_dir_all(&code_dir).unwrap();
+    }
+    copy_dir::copy_dir(embed_path.join("quickjs"), &code_dir)
+        .expect("Could not copy quickjs directory");
+
+    // Patch command generally unavailable on Windows
+    // #[cfg(feature = "patched")]
+    // apply_patches(&code_dir);
+
+    eprintln!("Compiling quickjs...");
+    cc::Build::new()
+        .files(
+            [
+                "cutils.c",
+                "libbf.c",
+                "libregexp.c",
+                "libunicode.c",
+                "quickjs.c",
+            ]
+            .iter()
+            .map(|f| code_dir.join(f)),
+        )
+        // JS_STRICT_NAN_BOXING required for MSVC build
+        .define("JS_STRICT_NAN_BOXING", None)
+        .define("_CRT_SECURE_NO_WARNINGS", None)
+        .define("CONFIG_BIGNUM", None)
+        .flag_if_supported("/std:c++latest")
+        // c-smile/quickjspp does not build with opt_level(2)!
+        .opt_level(1)
         .compile(LIB_NAME);
 
     std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
