@@ -20076,7 +20076,7 @@ typedef struct JSParseState {
     BOOL is_module; /* parsing a module */
     BOOL allow_html_comments;
     BOOL ext_json; /* true if accepting JSON superset */
-#ifdef CONFIG_JSX;
+#ifdef CONFIG_JSX
     BOOL allow_web_name_token; /* HTML and CSS tokens that accept '-' as part of the nmtoken */
 #endif
 } JSParseState;
@@ -20360,7 +20360,7 @@ static __exception int js_parse_string(JSParseState *s, int sep,
            /* expr start */
            --p;
            break;
-        } else 
+        } else
 #endif
         if (c == sep)
           break;
@@ -20632,7 +20632,7 @@ static JSAtom parse_ident(JSParseState *s, const uint8_t **pp,
             c = unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p1);
         }
 #ifdef CONFIG_JSX
-        if (c == '-' && s->allow_web_name_token) {;} else 
+        if (c == '-' && s->allow_web_name_token) {;} else
 #endif
         if (!lre_js_is_ident_next(c))
             break;

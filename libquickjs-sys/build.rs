@@ -60,6 +60,21 @@ fn main() {
 }
 
 #[cfg(not(target_env = "msvc"))]
+#[derive(Debug)]
+struct IgnoreMacros(std::collections::HashSet<String>);
+
+#[cfg(not(target_env = "msvc"))]
+impl bindgen::callbacks::ParseCallbacks for IgnoreMacros {
+    fn will_parse_macro(&self, name: &str) -> bindgen::callbacks::MacroParsingBehavior {
+        if self.0.contains(name) {
+            bindgen::callbacks::MacroParsingBehavior::Ignore
+        } else {
+            bindgen::callbacks::MacroParsingBehavior::Default
+        }
+    }
+}
+
+#[cfg(not(target_env = "msvc"))]
 #[cfg(feature = "bundled")]
 fn main() {
     // compile statics
@@ -121,6 +136,18 @@ fn main() {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
 
+    let ignored_macros = IgnoreMacros(
+        vec![
+            "FP_INFINITE".into(),
+            "FP_NAN".into(),
+            "FP_NORMAL".into(),
+            "FP_SUBNORMAL".into(),
+            "FP_ZERO".into(),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -131,6 +158,7 @@ fn main() {
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(ignored_macros))
         .clang_arg("-I".to_owned() + out_path.to_str().unwrap())
         // Finish the builder and generate the bindings.
         .generate()
