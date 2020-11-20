@@ -13,7 +13,6 @@ fn main() {
     panic!("Invalid config for crate libquickjs-sys: must enable either the 'bundled' or the 'system' feature");
 }
 
-#[cfg(feature = "system")]
 extern crate bindgen;
 
 #[cfg(feature = "system")]
@@ -119,8 +118,29 @@ fn main() {
         .opt_level(2)
         .compile(LIB_NAME);
 
-    std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
-        .expect("Could not copy bindings.rs");
+    // Tell cargo to invalidate the built crate whenever the wrapper changes
+    println!("cargo:rerun-if-changed=wrapper.h");
+
+    // The bindgen::Builder is the main entry point
+    // to bindgen, and lets you build up options for
+    // the resulting bindings.
+    let bindings = bindgen::Builder::default()
+        // The input header we would like to generate
+        // bindings for.
+        .header("wrapper.h")
+        // Tell cargo to invalidate the built crate whenever any of the
+        // included header files changed.
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .clang_arg("-I".to_owned() + out_path.to_str().unwrap())
+        // Finish the builder and generate the bindings.
+        .generate()
+        // Unwrap the Result and panic on failure.
+        .expect("Unable to generate bindings");
+
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
 }
 
 #[cfg(target_env = "msvc")]
@@ -171,8 +191,29 @@ fn main() {
         .opt_level(1)
         .compile(LIB_NAME);
 
-    std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
-        .expect("Could not copy bindings.rs");
+    // Tell cargo to invalidate the built crate whenever the wrapper changes
+    println!("cargo:rerun-if-changed=wrapper.h");
+
+    // The bindgen::Builder is the main entry point
+    // to bindgen, and lets you build up options for
+    // the resulting bindings.
+    let bindings = bindgen::Builder::default()
+        // The input header we would like to generate
+        // bindings for.
+        .header("wrapper.h")
+        // Tell cargo to invalidate the built crate whenever any of the
+        // included header files changed.
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .clang_arg("-I".to_owned() + out_path.to_str().unwrap())
+        // Finish the builder and generate the bindings.
+        .generate()
+        // Unwrap the Result and panic on failure.
+        .expect("Unable to generate bindings");
+
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
 }
 
 #[cfg(feature = "patched")]
